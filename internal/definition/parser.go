@@ -32,7 +32,7 @@ func LoadDefinition(configPath string) (*Definition, error) {
 }
 
 func (d *Definition) Validate() error {
-	if d.Version != 1 {
+	if d.Version != 1 && d.Version != 0 {
 		return fmt.Errorf("unsupported version: %d", d.Version)
 	}
 

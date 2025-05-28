@@ -69,6 +69,18 @@ operations:
 
 ### 2. Set Environment Variables
 
+You can set environment variables in two ways:
+
+**Option A: Using .env file (recommended)**
+
+```bash
+# Copy the example file and edit it
+cp .env.example .env
+# Edit .env file with your actual values
+```
+
+**Option B: Export environment variables**
+
 ```bash
 export DATABASE_URL="postgres://user:password@localhost:5432/dbname"
 # Optional: for GitHub integration
@@ -226,11 +238,23 @@ operations:
 
 ## Environment Variables
 
+### .env File Support
+
+opsql automatically loads environment variables from a `.env` file in the current directory if it exists. This is the recommended way to manage your configuration.
+
+```bash
+# Create your .env file from the example
+cp .env.example .env
+# Edit .env with your actual values
+```
+
+**Note**: The `.env` file is ignored by git to prevent accidental commits of sensitive information.
+
 ### Required
 
 - `DATABASE_URL`: Database connection string
   - PostgreSQL: `postgres://user:password@host:port/dbname`
-  - MySQL: `mysql://user:password@host:port/dbname`
+  - MySQL: `mysql://user:password@tcp(host:port)/dbname`
 
 ### Optional
 

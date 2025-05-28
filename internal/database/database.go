@@ -19,6 +19,7 @@ type DB interface {
 }
 
 type Transaction interface {
+	QueryRowsContext(ctx context.Context, query string, args ...interface{}) ([]map[string]interface{}, error)
 	ExecContext(ctx context.Context, query string, args ...interface{}) (int64, error)
 	Rollback() error
 	Commit() error
@@ -39,7 +40,12 @@ func NewDatabase(dsn string) (DB, error) {
 		return nil, err
 	}
 
-	db, err := sqlx.Connect(driver, dsn)
+	connectionString, err := convertDSN(dsn, driver)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sqlx.Connect(driver, connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -92,6 +98,25 @@ func (d *Database) BeginTransaction(ctx context.Context) (Transaction, error) {
 	return &Tx{Tx: tx}, nil
 }
 
+func (t *Tx) QueryRowsContext(ctx context.Context, query string, args ...interface{}) ([]map[string]interface{}, error) {
+	rows, err := t.Tx.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		row := make(map[string]interface{})
+		if err := rows.MapScan(row); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+
+	return results, rows.Err()
+}
+
 func (t *Tx) ExecContext(ctx context.Context, query string, args ...interface{}) (int64, error) {
 	result, err := t.Tx.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -123,6 +148,20 @@ func detectDriver(dsn string) (string, error) {
 		return "mysql", nil
 	}
 	return "", fmt.Errorf("unsupported database driver in DSN: %s", dsn)
+}
+
+func convertDSN(dsn, driver string) (string, error) {
+	switch driver {
+	case "mysql":
+		if strings.HasPrefix(dsn, "mysql://") {
+			return strings.TrimPrefix(dsn, "mysql://"), nil
+		}
+		return dsn, nil
+	case "postgres":
+		return dsn, nil
+	default:
+		return dsn, nil
+	}
 }
 
 func MaskSecret(dsn string) string {
