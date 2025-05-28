@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.4"
+          cache: true
+
+      - name: Install development dependencies
+        run: make devdeps
+
+      - name: Format check
+        run: |
+          make fmt
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "Code is not formatted. Please run 'make fmt'"
+            git diff
+            exit 1
+          fi
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build

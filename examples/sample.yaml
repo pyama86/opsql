@@ -1,0 +1,90 @@
+version: 1
+params:
+  cutoff_date: "2025-01-01"
+  target_user_ids: "1,2,3,4,5"
+  inactive_status_ids: "10,20,30"
+  batch_size: "1000"
+operations:
+  - id: check_target_users
+    description: "Check specific users before processing"
+    type: select
+    sql: |
+      SELECT id, email, status, last_login_at
+      FROM users
+      WHERE id IN ({{ .params.target_user_ids }})
+      ORDER BY id
+    expected:
+      - id: 1
+        email: "user1@example.com"
+        status: "active"
+      - id: 2
+        email: "user2@example.com"
+        status: "active"
+      - id: 3
+        email: "user3@example.com"
+        status: "inactive"
+
+  - id: get_users_by_status_list
+    description: "Get users with specific status IDs"
+    type: select
+    sql: |
+      SELECT status_id, COUNT(*) as user_count
+      FROM users
+      WHERE status_id IN ({{ .params.inactive_status_ids }})
+        AND created_at >= '{{ .params.cutoff_date }}'
+      GROUP BY status_id
+      ORDER BY status_id
+    expected:
+      - status_id: 10
+        user_count: 150
+      - status_id: 20
+        user_count: 75
+      - status_id: 30
+        user_count: 25
+
+  - id: delete_specific_user_logs
+    description: "Delete logs for specific users"
+    type: delete
+    sql: |
+      DELETE FROM user_activity_logs
+      WHERE user_id IN ({{ .params.target_user_ids }})
+        AND created_at < '{{ .params.cutoff_date }}'
+        AND action_type = 'DEBUG'
+    expected_changes:
+      delete: 120
+
+  - id: update_users_by_id_list
+    description: "Update specific users to inactive status"
+    type: update
+    sql: |
+      UPDATE users
+      SET status = 'inactive',
+          status_id = 30,
+          updated_at = NOW()
+      WHERE id IN ({{ .params.target_user_ids }})
+        AND status = 'active'
+    expected_changes:
+      update: 3
+
+  - id: bulk_insert_user_notifications
+    description: "Insert notifications for multiple users"
+    type: insert
+    sql: |
+      INSERT INTO notifications (user_id, message, type, created_at)
+      SELECT id, 'Your account has been updated', 'system', NOW()
+      FROM users
+      WHERE id IN ({{ .params.target_user_ids }})
+    expected_changes:
+      insert: 5
+
+  - id: cleanup_orphaned_records
+    description: "Delete records with no matching parent"
+    type: delete
+    sql: |
+      DELETE FROM user_preferences
+      WHERE user_id NOT IN (
+        SELECT id FROM users WHERE status != 'deleted'
+      )
+      AND updated_at < '{{ .params.cutoff_date }}'
+    expected_changes:
+      delete: 45
