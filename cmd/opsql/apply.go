@@ -3,6 +3,7 @@ package opsql
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pyama86/opsql/internal/database"
 	"github.com/pyama86/opsql/internal/definition"
@@ -23,7 +24,7 @@ If any assertion fails, the process exits with code 1.`,
 func init() {
 	applyCmd.Flags().StringP("config", "c", "", "YAML configuration file path (required)")
 
-	applyCmd.MarkFlagRequired("config")
+	_ = applyCmd.MarkFlagRequired("config")
 }
 
 func runApply(cmd *cobra.Command, args []string) error {
@@ -43,7 +44,11 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close database: %v\n", err)
+		}
+	}()
 
 	executor := executor.NewApplyExecutor(db)
 	reports, err := executor.Execute(ctx, def)

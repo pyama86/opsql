@@ -24,7 +24,7 @@ func (e *PlanExecutor) Execute(ctx context.Context, def *definition.Definition) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var reports []definition.Report
 

@@ -36,12 +36,12 @@ func (e *ApplyExecutor) Execute(ctx context.Context, def *definition.Definition)
 			}
 		}
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return reports, fmt.Errorf("operation[%s]: %w", op.ID, err)
 		}
 
 		if !report.Pass {
-			tx.Rollback()
+			_ = tx.Rollback()
 			fmt.Fprintf(os.Stderr, "Assertion failed for operation[%s]: %s\n", op.ID, report.Message)
 			os.Exit(1)
 		}

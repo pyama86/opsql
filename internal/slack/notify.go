@@ -49,7 +49,7 @@ func (c *Client) buildBlocks(reports []definition.Report) []slack.Block {
 	var blocks []slack.Block
 
 	// Header block
-	headerText := fmt.Sprintf("🔧 *opsql Execution Results*")
+	headerText := "🔧 *opsql Execution Results*"
 	blocks = append(blocks, slack.NewHeaderBlock(slack.NewTextBlockObject("plain_text", headerText, false, false)))
 
 	// Summary section

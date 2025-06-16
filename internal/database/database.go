@@ -57,11 +57,13 @@ func NewDatabase(dsn string) (DB, error) {
 }
 
 func (d *Database) QueryRowsContext(ctx context.Context, query string, args ...interface{}) ([]map[string]interface{}, error) {
-	rows, err := d.DB.QueryxContext(ctx, query, args...)
+	rows, err := d.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var results []map[string]interface{}
 	for rows.Next() {
@@ -90,7 +92,7 @@ func (d *Database) ExecContext(ctx context.Context, query string, args ...interf
 }
 
 func (d *Database) BeginTransaction(ctx context.Context) (Transaction, error) {
-	tx, err := d.DB.BeginTxx(ctx, nil)
+	tx, err := d.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +101,13 @@ func (d *Database) BeginTransaction(ctx context.Context) (Transaction, error) {
 }
 
 func (t *Tx) QueryRowsContext(ctx context.Context, query string, args ...interface{}) ([]map[string]interface{}, error) {
-	rows, err := t.Tx.QueryxContext(ctx, query, args...)
+	rows, err := t.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var results []map[string]interface{}
 	for rows.Next() {

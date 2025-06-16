@@ -23,7 +23,9 @@ func (m *MockDatabase) QueryRowsContext(ctx context.Context, query string, args 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -82,7 +84,9 @@ func (m *MockTransaction) QueryRowsContext(ctx context.Context, query string, ar
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -232,7 +236,11 @@ func TestPlanExecutor_TransactionExecution(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() {
+				if err := db.Close(); err != nil {
+					t.Logf("Warning: failed to close database: %v", err)
+				}
+			}()
 
 			tt.setupMock(mock)
 
@@ -309,7 +317,11 @@ func TestApplyExecutor_TransactionExecution(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() {
+				if err := db.Close(); err != nil {
+					t.Logf("Warning: failed to close database: %v", err)
+				}
+			}()
 
 			tt.setupMock(mock)
 

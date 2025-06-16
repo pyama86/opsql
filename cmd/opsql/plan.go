@@ -29,7 +29,7 @@ func init() {
 	planCmd.Flags().Int("github-pr", 0, "GitHub PR number")
 	planCmd.Flags().String("slack-webhook", "", "Slack webhook URL (optional, can use SLACK_WEBHOOK_URL env)")
 
-	planCmd.MarkFlagRequired("config")
+	_ = planCmd.MarkFlagRequired("config")
 }
 
 func runPlan(cmd *cobra.Command, args []string) error {
@@ -49,7 +49,11 @@ func runPlan(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close database: %v\n", err)
+		}
+	}()
 
 	executor := executor.NewPlanExecutor(db)
 	reports, err := executor.Execute(ctx, def)

@@ -30,9 +30,7 @@ func Execute() {
 
 func init() {
 	// .envファイルを読み込み（存在しない場合は無視）
-	if err := godotenv.Load(); err != nil {
-		// エラーは無視（ファイルが存在しない場合など）
-	}
+	_ = godotenv.Load()
 
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(applyCmd)
