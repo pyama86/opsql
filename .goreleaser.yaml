@@ -60,48 +60,6 @@ changelog:
     - title: Others
       order: 999
 
-dockers:
-  - image_templates:
-      - "ghcr.io/pyama86/opsql:{{ .Version }}-amd64"
-      - "ghcr.io/pyama86/opsql:latest-amd64"
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/pyama86/opsql"
-      - "--platform=linux/amd64"
-    goarch: amd64
-
-  - image_templates:
-      - "ghcr.io/pyama86/opsql:{{ .Version }}-arm64"
-      - "ghcr.io/pyama86/opsql:latest-arm64"
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/pyama86/opsql"
-      - "--platform=linux/arm64"
-    goarch: arm64
-
-docker_manifests:
-  - name_template: "ghcr.io/pyama86/opsql:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/pyama86/opsql:{{ .Version }}-amd64"
-      - "ghcr.io/pyama86/opsql:{{ .Version }}-arm64"
-
-  - name_template: "ghcr.io/pyama86/opsql:latest"
-    image_templates:
-      - "ghcr.io/pyama86/opsql:latest-amd64"
-      - "ghcr.io/pyama86/opsql:latest-arm64"
-
 release:
   github:
     owner: pyama86
@@ -147,7 +105,7 @@ brews:
       email: www.kazu.com@gmail.com
 
     homepage: "https://github.com/pyama86/opsql"
-    description: "MySQL schema change utility that automatically chooses between ALTER TABLE and pt-online-schema-change"
+    description: "opsql is a CLI tool that helps manage operational SQL operations with YAML definitions"
     license: "MIT"
     test: |
       system "#{bin}/opsql --help"

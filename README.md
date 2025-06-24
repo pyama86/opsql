@@ -33,11 +33,41 @@ go build -o opsql main.go
 
 ### 1. Create a YAML Configuration
 
+**Simple Format (Recommended):**
+
 ```yaml
 version: 1
 params:
-  cutoff_date: "2025-01-01"
-  target_user_ids: "1,2,3,4,5"
+  target_user_ids: "1,2,3"
+operations:
+  - sql: |
+      SELECT id, email, status
+      FROM users
+      WHERE id IN ({{ .params.target_user_ids }})
+      ORDER BY id
+    expected:
+      - id: 1
+        email: "user1@example.com"
+        status: "active"
+      - id: 2
+        email: "user2@example.com"
+        status: "active"
+
+  - sql: |
+      UPDATE users
+      SET status = 'inactive', updated_at = NOW()
+      WHERE id IN ({{ .params.target_user_ids }})
+        AND status = 'active'
+    expected_changes:
+      update: 2
+```
+
+**Full Format (Legacy):**
+
+```yaml
+version: 1
+params:
+  target_user_ids: "1,2,3"
 operations:
   - id: check_target_users
     description: "Check specific users before processing"
@@ -51,9 +81,6 @@ operations:
       - id: 1
         email: "user1@example.com"
         status: "active"
-      - id: 2
-        email: "user2@example.com"
-        status: "active"
 
   - id: update_users_by_id_list
     description: "Update specific users to inactive status"
@@ -64,7 +91,7 @@ operations:
       WHERE id IN ({{ .params.target_user_ids }})
         AND status = 'active'
     expected_changes:
-      update: 3
+      update: 2
 ```
 
 ### 2. Set Environment Variables
@@ -154,14 +181,31 @@ opsql apply --config operations.yaml
 
 ### Structure
 
+**Simple Format (Recommended):**
+
 ```yaml
 version: 1 # Configuration version (required)
 params: # Template parameters (optional)
   key: "value"
 operations: # List of operations (required)
-  - id: "operation_id" # Unique identifier (required)
-    description: "desc" # Human-readable description (required)
-    type: "select|insert|update|delete" # Operation type (required)
+  - sql: | # SQL statement (required)
+      SELECT * FROM table
+    expected: # For SELECT operations (required for SELECT)
+      - column: value
+    expected_changes: # For DML operations (required for DML)
+      insert|update|delete: count
+```
+
+**Full Format (Legacy):**
+
+```yaml
+version: 1 # Configuration version (required)
+params: # Template parameters (optional)
+  key: "value"
+operations: # List of operations (required)
+  - id: "operation_id" # Unique identifier (optional)
+    description: "desc" # Human-readable description (optional)
+    type: "select|insert|update|delete" # Operation type (optional, auto-detected)
     sql: | # SQL statement (required)
       SELECT * FROM table
     expected: # For SELECT operations (required for SELECT)
@@ -170,9 +214,28 @@ operations: # List of operations (required)
       insert|update|delete: count
 ```
 
+### Auto-Detection Features
+
+- **Operation Type**: Automatically detected from SQL keywords (SELECT, INSERT, UPDATE, DELETE)
+- **Operation ID**: Auto-generated as `operation_N` if not specified
+- **Description**: Optional field for documentation purposes
+
 ### Operation Types
 
 #### SELECT Operations
+
+**Simple Format:**
+
+```yaml
+- sql: "SELECT id, email FROM users WHERE status = 'active'"
+  expected:
+    - id: 1
+      email: "user1@example.com"
+    - id: 2
+      email: "user2@example.com"
+```
+
+**Full Format:**
 
 ```yaml
 - id: get_users
@@ -188,6 +251,16 @@ operations: # List of operations (required)
 
 #### INSERT Operations
 
+**Simple Format:**
+
+```yaml
+- sql: "INSERT INTO logs (message, created_at) VALUES ('test', NOW())"
+  expected_changes:
+    insert: 1
+```
+
+**Full Format:**
+
 ```yaml
 - id: create_log
   description: "Create audit log"
@@ -199,6 +272,16 @@ operations: # List of operations (required)
 
 #### UPDATE Operations
 
+**Simple Format:**
+
+```yaml
+- sql: "UPDATE users SET status = 'inactive' WHERE id IN (1,2,3)"
+  expected_changes:
+    update: 3
+```
+
+**Full Format:**
+
 ```yaml
 - id: update_status
   description: "Update user status"
@@ -209,6 +292,16 @@ operations: # List of operations (required)
 ```
 
 #### DELETE Operations
+
+**Simple Format:**
+
+```yaml
+- sql: "DELETE FROM logs WHERE created_at < '2025-01-01'"
+  expected_changes:
+    delete: 100
+```
+
+**Full Format:**
 
 ```yaml
 - id: cleanup_logs
@@ -322,14 +415,13 @@ jobs:
 
 ### Bulk Operations with IN Clauses
 
+**Simple Format:**
+
 ```yaml
 params:
   target_user_ids: "1,2,3,4,5"
 operations:
-  - id: bulk_update
-    description: "Update multiple users"
-    type: update
-    sql: |
+  - sql: |
       UPDATE users
       SET status = 'inactive'
       WHERE id IN ({{ .params.target_user_ids }})
@@ -339,31 +431,26 @@ operations:
 
 ### Data Validation Before Changes
 
+**Simple Format:**
+
 ```yaml
 operations:
-  - id: validate_data
-    description: "Validate data before changes"
-    type: select
-    sql: "SELECT COUNT(*) as cnt FROM users WHERE status = 'pending'"
+  - sql: "SELECT COUNT(*) as cnt FROM users WHERE status = 'pending'"
     expected:
       - cnt: 10
 
-  - id: process_pending
-    description: "Process pending users"
-    type: update
-    sql: "UPDATE users SET status = 'active' WHERE status = 'pending'"
+  - sql: "UPDATE users SET status = 'active' WHERE status = 'pending'"
     expected_changes:
       update: 10
 ```
 
 ### Cleanup Operations
 
+**Simple Format:**
+
 ```yaml
 operations:
-  - id: cleanup_orphaned
-    description: "Remove orphaned records"
-    type: delete
-    sql: |
+  - sql: |
       DELETE FROM user_sessions
       WHERE user_id NOT IN (SELECT id FROM users)
         AND created_at < NOW() - INTERVAL '30 days'

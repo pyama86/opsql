@@ -37,24 +37,36 @@ func (d *Definition) Validate() error {
 	}
 
 	for i, op := range d.Operations {
-		if op.ID == "" {
-			return fmt.Errorf("operation[%d]: id is required", i)
-		}
-		if op.Type == "" {
-			return fmt.Errorf("operation[%s]: type is required", op.ID)
-		}
-		if !contains(AllowedTypes, op.Type) {
-			return fmt.Errorf("operation[%s]: unsupported type: %s (allowed: %v)", op.ID, op.Type, AllowedTypes)
-		}
 		if op.SQL == "" {
-			return fmt.Errorf("operation[%s]: sql is required", op.ID)
+			return fmt.Errorf("operation[%d]: sql is required", i)
 		}
 
-		if op.Type == TypeSelect && len(op.Expected) == 0 {
-			return fmt.Errorf("operation[%s]: expected is required for SELECT", op.ID)
+		// IDが未指定の場合はインデックスを使用
+		opID := op.ID
+		if opID == "" {
+			opID = fmt.Sprintf("operation_%d", i)
 		}
-		if op.Type != TypeSelect && len(op.ExpectedChanges) == 0 {
-			return fmt.Errorf("operation[%s]: expected_changes is required for DML", op.ID)
+
+		// Typeが未指定の場合はSQLから自動判定
+		opType := op.Type
+		if opType == "" {
+			opType = DetectSQLType(op.SQL)
+			if opType == "" {
+				return fmt.Errorf("operation[%s]: unable to detect SQL type from query", opID)
+			}
+			// 自動判定されたタイプを設定
+			d.Operations[i].Type = opType
+		}
+
+		if !contains(AllowedTypes, opType) {
+			return fmt.Errorf("operation[%s]: unsupported type: %s (allowed: %v)", opID, opType, AllowedTypes)
+		}
+
+		if opType == TypeSelect && len(op.Expected) == 0 {
+			return fmt.Errorf("operation[%s]: expected is required for SELECT", opID)
+		}
+		if opType != TypeSelect && len(op.ExpectedChanges) == 0 {
+			return fmt.Errorf("operation[%s]: expected_changes is required for DML", opID)
 		}
 	}
 
@@ -63,16 +75,21 @@ func (d *Definition) Validate() error {
 
 func (d *Definition) ProcessTemplates() error {
 	for i, op := range d.Operations {
-		tmpl, err := template.New(op.ID).Parse(op.SQL)
+		opID := op.ID
+		if opID == "" {
+			opID = fmt.Sprintf("operation_%d", i)
+		}
+
+		tmpl, err := template.New(opID).Parse(op.SQL)
 		if err != nil {
-			return fmt.Errorf("operation[%s]: failed to parse SQL template: %w", op.ID, err)
+			return fmt.Errorf("operation[%s]: failed to parse SQL template: %w", opID, err)
 		}
 
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, map[string]interface{}{
 			"params": d.Params,
 		}); err != nil {
-			return fmt.Errorf("operation[%s]: failed to execute SQL template: %w", op.ID, err)
+			return fmt.Errorf("operation[%s]: failed to execute SQL template: %w", opID, err)
 		}
 
 		d.Operations[i].SQL = buf.String()

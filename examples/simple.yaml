@@ -1,0 +1,38 @@
+version: 1
+params:
+  target_user_ids: "1,2,3"
+operations:
+  - sql: |
+      SELECT id, email, status
+      FROM users
+      WHERE id IN ({{ .params.target_user_ids }})
+      ORDER BY id
+    expected:
+      - id: 1
+        email: "user1@example.com"
+        status: "active"
+      - id: 2
+        email: "user2@example.com"
+        status: "active"
+
+  - sql: |
+      UPDATE users
+      SET status = 'inactive', updated_at = NOW()
+      WHERE id IN ({{ .params.target_user_ids }})
+        AND status = 'active'
+    expected_changes:
+      update: 2
+
+  - sql: |
+      INSERT INTO user_logs (user_id, action, created_at)
+      SELECT id, 'status_updated', NOW()
+      FROM users
+      WHERE id IN ({{ .params.target_user_ids }})
+    expected_changes:
+      insert: 3
+
+  - sql: |
+      DELETE FROM user_sessions
+      WHERE user_id IN ({{ .params.target_user_ids }})
+    expected_changes:
+      delete: 5
