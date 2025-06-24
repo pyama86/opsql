@@ -94,20 +94,3 @@ release:
     ```
 
   name_template: "Release {{ .Version }}"
-
-brews:
-  - name: opsql
-    repository:
-      owner: pyama86
-      name: homebrew-tap
-    commit_author:
-      name: pyama86
-      email: www.kazu.com@gmail.com
-
-    homepage: "https://github.com/pyama86/opsql"
-    description: "opsql is a CLI tool that helps manage operational SQL operations with YAML definitions"
-    license: "MIT"
-    test: |
-      system "#{bin}/opsql --help"
-    install: |
-      bin.install "opsql"
