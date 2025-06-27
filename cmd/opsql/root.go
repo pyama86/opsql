@@ -15,8 +15,9 @@ var rootCmd = &cobra.Command{
 It provides dry-run capabilities, assertion validation, and integration with GitHub and Slack.
 
 Features:
-- Plan mode (dry-run) for safe SQL execution preview
-- Apply mode for actual SQL execution with validation
+- Run mode with --dry-run flag for safe SQL execution preview
+- Direct execution for actual SQL operations with validation
+- Environment-specific execution with --environment flag
 - GitHub PR comment integration
 - Slack notification support
 - YAML-based operation definitions`,
@@ -32,6 +33,5 @@ func init() {
 	// .envファイルを読み込み（存在しない場合は無視）
 	_ = godotenv.Load()
 
-	rootCmd.AddCommand(planCmd)
-	rootCmd.AddCommand(applyCmd)
+	rootCmd.AddCommand(runCmd)
 }

@@ -21,6 +21,7 @@ type Report struct {
 	ID          string      `json:"id"`
 	Description string      `json:"description"`
 	Type        string      `json:"type"`
+	SQL         string      `json:"sql"`
 	Result      interface{} `json:"result"`
 	Pass        bool        `json:"pass"`
 	Message     string      `json:"message"`

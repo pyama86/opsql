@@ -3,7 +3,6 @@ package executor
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/pyama86/opsql/internal/database"
 	"github.com/pyama86/opsql/internal/definition"
@@ -31,9 +30,6 @@ func (e *ApplyExecutor) Execute(ctx context.Context, def *definition.Definition)
 		report, err := e.executeOperation(ctx, tx, op)
 		if report != nil {
 			reports = append(reports, *report)
-			if !report.Pass {
-				fmt.Fprintf(os.Stderr, "Operation[%s] failed: %s\n", report.ID, report.Message)
-			}
 		}
 		if err != nil {
 			_ = tx.Rollback()
@@ -42,8 +38,7 @@ func (e *ApplyExecutor) Execute(ctx context.Context, def *definition.Definition)
 
 		if !report.Pass {
 			_ = tx.Rollback()
-			fmt.Fprintf(os.Stderr, "Assertion failed for operation[%s]: %s\n", op.ID, report.Message)
-			os.Exit(1)
+			return reports, fmt.Errorf("operation[%s] failed: %s", op.ID, report.Message)
 		}
 	}
 

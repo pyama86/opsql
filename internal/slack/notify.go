@@ -20,11 +20,15 @@ func NewClient(webhookURL string) *Client {
 }
 
 func (c *Client) SendNotification(reports []definition.Report) error {
+	return c.SendNotificationWithContext(reports, false, "")
+}
+
+func (c *Client) SendNotificationWithContext(reports []definition.Report, isDryRun bool, environment string) error {
 	if c.webhookURL == "" {
 		return fmt.Errorf("SLACK_WEBHOOK_URL is not set")
 	}
 
-	blocks := c.buildBlocks(reports)
+	blocks := c.buildBlocksWithContext(reports, isDryRun, environment)
 	msg := &slack.WebhookMessage{
 		Blocks: &slack.Blocks{
 			BlockSet: blocks,
@@ -35,6 +39,10 @@ func (c *Client) SendNotification(reports []definition.Report) error {
 }
 
 func (c *Client) buildBlocks(reports []definition.Report) []slack.Block {
+	return c.buildBlocksWithContext(reports, false, "")
+}
+
+func (c *Client) buildBlocksWithContext(reports []definition.Report, isDryRun bool, environment string) []slack.Block {
 	passCount := 0
 	failCount := 0
 
@@ -48,8 +56,14 @@ func (c *Client) buildBlocks(reports []definition.Report) []slack.Block {
 
 	var blocks []slack.Block
 
-	// Header block
-	headerText := "🔧 *opsql Execution Results*"
+	// Header block with context
+	headerText := "🔧 opsql Execution Results"
+	if isDryRun {
+		headerText += " (Dry Run)"
+	}
+	if environment != "" {
+		headerText += fmt.Sprintf(" [%s]", environment)
+	}
 	blocks = append(blocks, slack.NewHeaderBlock(slack.NewTextBlockObject("plain_text", headerText, false, false)))
 
 	// Summary section
@@ -91,6 +105,11 @@ func (c *Client) buildOperationBlock(report definition.Report) slack.Block {
 
 	// Status field
 	fields = append(fields, slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Status:*\n%s", report.Message), false, false))
+
+	// SQL Query field
+	if report.SQL != "" {
+		fields = append(fields, slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Query:*\n```%s```", report.SQL), false, false))
+	}
 
 	// Result field for DML operations
 	if report.Result != nil && report.Type != definition.TypeSelect {

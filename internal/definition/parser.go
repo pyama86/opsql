@@ -12,7 +12,7 @@ import (
 func LoadDefinition(configPath string) (*Definition, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		return nil, fmt.Errorf("failed to read config file: %s %w", configPath, err)
 	}
 
 	var def Definition
@@ -45,6 +45,7 @@ func (d *Definition) Validate() error {
 		opID := op.ID
 		if opID == "" {
 			opID = fmt.Sprintf("operation_%d", i)
+			d.Operations[i].ID = opID
 		}
 
 		// Typeが未指定の場合はSQLから自動判定
