@@ -109,7 +109,7 @@ cp .env.example .env
 **Option B: Export environment variables**
 
 ```bash
-export DATABASE_URL="postgres://user:password@localhost:5432/dbname"
+export DATABASE_DSN="postgres://user:password@localhost:5432/dbname"
 # Optional: for GitHub integration
 export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 # Optional: for Slack notifications
@@ -345,7 +345,7 @@ cp .env.example .env
 
 ### Required
 
-- `DATABASE_URL`: Database connection string
+- `DATABASE_DSN`: Database connection string
   - PostgreSQL: `postgres://user:password@host:port/dbname`
   - MySQL: `mysql://user:password@tcp(host:port)/dbname`
 
@@ -382,7 +382,7 @@ jobs:
 
       - name: Run opsql plan
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_DSN: ${{ secrets.DATABASE_DSN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
@@ -407,7 +407,7 @@ jobs:
 
       - name: Run opsql apply
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_DSN: ${{ secrets.DATABASE_DSN }}
         run: opsql apply --config db/operations/maintenance.yaml
 ```
 
@@ -462,8 +462,8 @@ operations:
 
 ### Common Issues
 
-**Q: "DATABASE_URL environment variable is required" error**
-A: Set the DATABASE_URL environment variable with your database connection string.
+**Q: "DATABASE_DSN environment variable is required" error**
+A: Set the DATABASE_DSN environment variable with your database connection string.
 
 **Q: "connection refused" error**
 A: Check your database connection settings:

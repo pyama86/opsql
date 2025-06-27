@@ -36,7 +36,7 @@ func init() {
 
 type RunConfig struct {
 	ConfigFile   string
-	DatabaseURL  string
+	DatabaseDSN  string
 	DryRun       bool
 	Environment  string
 	GitHubRepo   string
@@ -57,7 +57,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load definition: %w", err)
 	}
 
-	db, err := database.NewDatabase(config.DatabaseURL)
+	db, err := database.NewDatabase(config.DatabaseDSN)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -112,9 +112,9 @@ func loadRunConfig(cmd *cobra.Command) (*RunConfig, error) {
 		config.Environment = os.Getenv("OPSQL_ENVIRONMENT")
 	}
 
-	config.DatabaseURL = os.Getenv("DATABASE_URL")
-	if config.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL environment variable is required")
+	config.DatabaseDSN = os.Getenv("DATABASE_DSN")
+	if config.DatabaseDSN == "" {
+		return nil, fmt.Errorf("DATABASE_DSN environment variable is required")
 	}
 
 	return config, nil
