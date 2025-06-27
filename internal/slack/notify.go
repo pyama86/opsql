@@ -57,12 +57,13 @@ func (c *Client) buildBlocksWithContext(reports []definition.Report, isDryRun bo
 	var blocks []slack.Block
 
 	// Header block with context
-	headerText := "🔧 opsql Execution Results"
+	headerText := "🔧 "
+	if environment != "" {
+		headerText += fmt.Sprintf("[%s] ", environment)
+	}
+	headerText += "opsql Execution Results"
 	if isDryRun {
 		headerText += " (Dry Run)"
-	}
-	if environment != "" {
-		headerText += fmt.Sprintf(" [%s]", environment)
 	}
 	blocks = append(blocks, slack.NewHeaderBlock(slack.NewTextBlockObject("plain_text", headerText, false, false)))
 

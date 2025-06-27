@@ -84,12 +84,13 @@ func formatComment(reports []definition.Report) string {
 
 func formatCommentWithContext(reports []definition.Report, isDryRun bool, environment string) string {
 	var buf strings.Builder
-	title := "## opsql Execution Results"
+	title := "## "
+	if environment != "" {
+		title += fmt.Sprintf("[%s] ", environment)
+	}
+	title += "opsql Execution Results"
 	if isDryRun {
 		title += " (Dry Run)"
-	}
-	if environment != "" {
-		title += fmt.Sprintf(" [%s]", environment)
 	}
 	buf.WriteString(title + "\n\n")
 
