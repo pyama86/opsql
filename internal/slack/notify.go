@@ -30,6 +30,7 @@ func (c *Client) SendNotificationWithContext(reports []definition.Report, isDryR
 
 	blocks := c.buildBlocksWithContext(reports, isDryRun, environment)
 	msg := &slack.WebhookMessage{
+		Username: "opsql",
 		Blocks: &slack.Blocks{
 			BlockSet: blocks,
 		},
