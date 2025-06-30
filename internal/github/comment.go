@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,16 @@ type Client struct {
 }
 
 func NewClient(repo string, pr int) *Client {
+	// Try GitHub App authentication first
+	if client := newGitHubAppClient(); client != nil {
+		return &Client{
+			client: client,
+			repo:   repo,
+			pr:     pr,
+		}
+	}
+
+	// Fallback to personal access token
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return &Client{repo: repo, pr: pr}
@@ -44,7 +55,7 @@ func (c *Client) PostComment(ctx context.Context, reports []definition.Report) e
 
 func (c *Client) PostCommentWithContext(ctx context.Context, reports []definition.Report, isDryRun bool, environment string) error {
 	if c.client == nil {
-		return fmt.Errorf("GITHUB_TOKEN is not set")
+		return fmt.Errorf("GitHub authentication not configured (GITHUB_TOKEN or GitHub App credentials required)")
 	}
 
 	if c.repo == "" {
@@ -157,4 +168,52 @@ func extractPRNumber() int {
 	}
 
 	return 0
+}
+
+// newGitHubAppClient creates a GitHub client using GitHub App authentication
+func newGitHubAppClient() *github.Client {
+	appID := os.Getenv("GITHUB_APP_ID")
+	installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")
+	privateKeyPath := os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH")
+	privateKeyContent := os.Getenv("GITHUB_APP_PRIVATE_KEY")
+
+	if appID == "" || installationID == "" {
+		return nil
+	}
+
+	if privateKeyPath == "" && privateKeyContent == "" {
+		return nil
+	}
+
+	var privateKeyData []byte
+	var err error
+
+	if privateKeyContent != "" {
+		privateKeyData = []byte(privateKeyContent)
+	} else {
+		privateKeyData, err = os.ReadFile(privateKeyPath)
+		if err != nil {
+			return nil
+		}
+	}
+
+	appIDInt, err := strconv.ParseInt(appID, 10, 64)
+	if err != nil {
+		return nil
+	}
+
+	installationIDInt, err := strconv.ParseInt(installationID, 10, 64)
+	if err != nil {
+		return nil
+	}
+
+	// Use go-github's built-in GitHub App transport
+	itr, err := github.NewAppsTransport(privateKeyData, appIDInt)
+	if err != nil {
+		return nil
+	}
+
+	itr.InstallationID = installationIDInt
+	client := github.NewClient(&http.Client{Transport: itr})
+	return client
 }

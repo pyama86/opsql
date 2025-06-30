@@ -351,9 +351,22 @@ cp .env.example .env
 
 ### Optional
 
+**GitHub Integration (choose one):**
+
+*Option A: Personal Access Token*
 - `GITHUB_TOKEN`: GitHub personal access token for PR comments
+
+*Option B: GitHub App (recommended)*
+- `GITHUB_APP_ID`: GitHub App ID
+- `GITHUB_APP_INSTALLATION_ID`: GitHub App Installation ID
+- `GITHUB_APP_PRIVATE_KEY_PATH`: Path to GitHub App private key file
+- `GITHUB_APP_PRIVATE_KEY`: GitHub App private key content (alternative to file path)
+
+**GitHub Actions (auto-detected):**
 - `GITHUB_REPOSITORY`: GitHub repository (owner/repo) - auto-detected in GitHub Actions
 - `GITHUB_REF`: GitHub reference - auto-detected in GitHub Actions
+
+**Slack Integration:**
 - `SLACK_WEBHOOK_URL`: Slack incoming webhook URL for notifications
 
 ## GitHub Actions Integration
@@ -383,7 +396,12 @@ jobs:
       - name: Run opsql plan
         env:
           DATABASE_DSN: ${{ secrets.DATABASE_DSN }}
+          # Option A: Personal Access Token
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Option B: GitHub App (recommended)
+          # GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          # GITHUB_APP_INSTALLATION_ID: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          # GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           opsql plan \
