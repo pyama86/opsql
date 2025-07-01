@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/google/go-github/v73/github"
 	"github.com/pyama86/opsql/internal/definition"
 	"golang.org/x/oauth2"
 )
@@ -210,13 +213,27 @@ func newGitHubAppClient() *github.Client {
 		return nil
 	}
 
-	// Use go-github's built-in GitHub App transport
-	itr, err := github.NewAppsTransport(privateKeyData, appIDInt)
+	appTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appIDInt, privateKeyData)
 	if err != nil {
 		return nil
 	}
 
-	itr.InstallationID = installationIDInt
-	client := github.NewClient(&http.Client{Transport: itr})
-	return client
+	client := github.NewClient(
+		&http.Client{
+			Transport: appTransport,
+			Timeout:   time.Second * 30,
+		},
+	)
+
+	token, _, err := client.Apps.CreateInstallationToken(
+		context.Background(),
+		installationIDInt,
+		&github.InstallationTokenOptions{})
+	if err != nil {
+		log.Fatalf("failed to create installation token: %v\n", err)
+	}
+
+	return github.NewClient(nil).WithAuthToken(
+		token.GetToken(),
+	)
 }

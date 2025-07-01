@@ -146,7 +146,7 @@ func mergeDefinitions(base, additional *Definition) error {
 	
 	// Merge parameters - additional params override base params
 	if base.Params == nil {
-		base.Params = make(map[string]interface{})
+		base.Params = make(map[string]string)
 	}
 	for key, value := range additional.Params {
 		base.Params[key] = value
