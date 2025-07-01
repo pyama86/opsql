@@ -69,7 +69,8 @@ func (c *Client) PostCommentWithContext(ctx context.Context, reports []definitio
 	}
 
 	if c.repo == "" || c.pr == 0 {
-		return fmt.Errorf("GitHub repository or PR number not specified")
+		log.Printf("GITHUB_REPOSITORY or GITHUB_PR environment variables are not set, skipping GitHub comment\n")
+		return nil
 	}
 
 	parts := strings.Split(c.repo, "/")
