@@ -173,6 +173,9 @@ func extractPRNumber() int {
 // newGitHubAppClient creates a GitHub client using GitHub App authentication
 func newGitHubAppClient() *github.Client {
 	appID := os.Getenv("GITHUB_APP_ID")
+	if appID == "" {
+		appID = os.Getenv("GITHUB_CLIENT_ID")
+	}
 	installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")
 	privateKeyPath := os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH")
 	privateKeyContent := os.Getenv("GITHUB_APP_PRIVATE_KEY")
