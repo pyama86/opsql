@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v73/github"
 	"github.com/pyama86/opsql/internal/definition"
 	"golang.org/x/oauth2"
@@ -222,19 +221,13 @@ func newGitHubAppClient() *github.Client {
 		}
 	}
 
-	appIDInt, err := strconv.ParseInt(appID, 10, 64)
-	if err != nil {
-		log.Printf("invalid GITHUB_APP_ID: %v\n", err)
-		return nil
-	}
-
 	installationIDInt, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
 		log.Printf("invalid GITHUB_APP_INSTALLATION_ID: %v\n", err)
 		return nil
 	}
 
-	appTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appIDInt, privateKeyData)
+	appTransport, err := NewAppsTransport(http.DefaultTransport, appID, privateKeyData)
 	if err != nil {
 		log.Printf("failed to create GitHub App transport: %v\n", err)
 		return nil
