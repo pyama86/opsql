@@ -417,7 +417,7 @@ cp .env.example .env
 - `GITHUB_TOKEN`: GitHub personal access token for PR comments
 
 *Option B: GitHub App (recommended)*
-- `GITHUB_APP_ID` or `GITHUB_CLIENT_ID`: GitHub App ID
+- `GITHUB_APP_ID` or `GITHUB_APP_CLIENT_ID`: GitHub App ID
 - `GITHUB_APP_INSTALLATION_ID`: GitHub App Installation ID
 - `GITHUB_APP_PRIVATE_KEY_PATH`: Path to GitHub App private key file
 - `GITHUB_APP_PRIVATE_KEY`: GitHub App private key content (alternative to file path)
@@ -460,7 +460,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Option B: GitHub App (recommended)
           GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          # GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}  # Alternative to GITHUB_APP_ID
+          # GITHUB_APP_CLIENT_ID: ${{ secrets.GITHUB_APP_CLIENT_ID }}  # Alternative to GITHUB_APP_ID
           GITHUB_APP_INSTALLATION_ID: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
