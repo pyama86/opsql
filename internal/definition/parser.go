@@ -9,6 +9,35 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func LoadDefinitions(configPaths []string) (*Definition, error) {
+	if len(configPaths) == 0 {
+		return nil, fmt.Errorf("no configuration files specified")
+	}
+	
+	if len(configPaths) == 1 {
+		return LoadDefinition(configPaths[0])
+	}
+	
+	// Load and merge multiple configuration files
+	var mergedDef *Definition
+	for i, configPath := range configPaths {
+		def, err := LoadDefinition(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config file %s: %w", configPath, err)
+		}
+		
+		if i == 0 {
+			mergedDef = def
+		} else {
+			if err := mergeDefinitions(mergedDef, def); err != nil {
+				return nil, fmt.Errorf("failed to merge config file %s: %w", configPath, err)
+			}
+		}
+	}
+	
+	return mergedDef, nil
+}
+
 func LoadDefinition(configPath string) (*Definition, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -106,4 +135,52 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// mergeDefinitions merges two definitions together
+func mergeDefinitions(base, additional *Definition) error {
+	// Version validation - all files should have the same version
+	if base.Version != additional.Version {
+		return fmt.Errorf("version mismatch: base has version %d, additional has version %d", base.Version, additional.Version)
+	}
+	
+	// Merge parameters - additional params override base params
+	if base.Params == nil {
+		base.Params = make(map[string]interface{})
+	}
+	for key, value := range additional.Params {
+		base.Params[key] = value
+	}
+	
+	// Check for duplicate operation IDs
+	existingIDs := make(map[string]bool)
+	for _, op := range base.Operations {
+		if op.ID != "" {
+			existingIDs[op.ID] = true
+		}
+	}
+	
+	// Append operations from additional definition
+	for i, op := range additional.Operations {
+		if op.ID != "" && existingIDs[op.ID] {
+			return fmt.Errorf("duplicate operation ID: %s", op.ID)
+		}
+		
+		// If ID is empty, it will be auto-generated during validation
+		// But we need to track it to avoid duplicates
+		if op.ID == "" {
+			// Auto-generate ID for checking duplicates
+			autoID := fmt.Sprintf("operation_%d", len(base.Operations)+i)
+			if existingIDs[autoID] {
+				return fmt.Errorf("auto-generated operation ID conflict: %s", autoID)
+			}
+		}
+		
+		base.Operations = append(base.Operations, op)
+		if op.ID != "" {
+			existingIDs[op.ID] = true
+		}
+	}
+	
+	return nil
 }

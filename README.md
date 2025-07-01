@@ -119,28 +119,41 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/xxx/yyy/zzz"
 ### 3. Run Plan (Dry-run)
 
 ```bash
-opsql plan --config operations.yaml
+# Single configuration file
+opsql run --config operations.yaml --dry-run
+
+# Multiple configuration files (merged in order)
+opsql run --config base.yaml --config additional.yaml --dry-run
 ```
 
 ### 4. Apply Changes
 
 ```bash
-opsql apply --config operations.yaml
+# Single configuration file
+opsql run --config operations.yaml
+
+# Multiple configuration files
+opsql run --config base.yaml --config additional.yaml
 ```
 
 ## Command Reference
 
-### plan
+### run
 
-Execute SQL operations in dry-run mode without making permanent changes.
+Execute SQL operations with or without database changes.
 
 ```bash
-opsql plan [flags]
+opsql run [flags]
 ```
 
 **Flags:**
 
-- `-c, --config string`: YAML configuration file path (required)
+- `-c, --config strings`: YAML configuration file paths (required, can specify multiple)
+- `-d, --dry-run`: Execute in dry-run mode without making permanent changes
+- `-e, --environment string`: Environment name (e.g., dev, staging, prod)
+- `--github-repo string`: GitHub repository (owner/repo)
+- `--github-pr int`: GitHub PR number
+- `--slack-webhook string`: Slack webhook URL
 - `--github-repo string`: GitHub repository (owner/repo)
 - `--github-pr int`: GitHub PR number
 - `--slack-webhook string`: Slack webhook URL
@@ -148,34 +161,81 @@ opsql plan [flags]
 **Examples:**
 
 ```bash
-# Basic plan execution
-opsql plan --config operations.yaml
+# Basic execution with single config
+opsql run --config operations.yaml --dry-run
+
+# Multiple configuration files
+opsql run --config base.yaml --config env-specific.yaml --dry-run
 
 # With GitHub PR integration
-opsql plan --config operations.yaml --github-repo myorg/myrepo --github-pr 123
+opsql run --config operations.yaml --dry-run --github-repo myorg/myrepo --github-pr 123
 
 # With Slack notification
-opsql plan --config operations.yaml --slack-webhook https://hooks.slack.com/services/xxx
+opsql run --config operations.yaml --dry-run --slack-webhook https://hooks.slack.com/services/xxx
 ```
-
-### apply
-
-Execute SQL operations with actual database changes.
-
-```bash
-opsql apply [flags]
-```
-
-**Flags:**
-
-- `-c, --config string`: YAML configuration file path (required)
 
 **Examples:**
 
 ```bash
-# Apply changes
-opsql apply --config operations.yaml
+# Apply changes with single config
+opsql run --config operations.yaml
+
+# Apply changes with multiple configs
+opsql run --config base.yaml --config env-specific.yaml
 ```
+
+## Multiple Configuration Files
+
+opsql supports loading multiple configuration files that are merged together. This is useful for:
+
+- Separating base operations from environment-specific operations
+- Organizing operations by feature or module
+- Sharing common parameters across different operation sets
+
+### Usage
+
+```bash
+# Multiple files are merged in the order specified
+opsql run --config base.yaml --config env-specific.yaml --config feature.yaml
+```
+
+### Merging Behavior
+
+When multiple configuration files are specified:
+
+1. **Version**: All files must have the same version number
+2. **Parameters**: Later files override parameters from earlier files
+3. **Operations**: Operations are appended in order from all files
+4. **Operation IDs**: Must be unique across all files (duplicates cause errors)
+
+### Example
+
+**base.yaml:**
+```yaml
+version: 1
+params:
+  database_name: "myapp"
+  environment: "dev"
+operations:
+  - id: check_users
+    sql: "SELECT COUNT(*) as cnt FROM users"
+    expected:
+      - cnt: 100
+```
+
+**production.yaml:**
+```yaml
+version: 1
+params:
+  environment: "prod"  # Overrides base.yaml
+operations:
+  - id: prod_cleanup
+    sql: "DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'"
+    expected_changes:
+      delete: 1000
+```
+
+The merged result will have `environment: "prod"` and both operations.
 
 ## YAML Configuration Reference
 
@@ -405,8 +465,9 @@ jobs:
           # GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          opsql plan \
+          opsql run \
             --config db/operations/maintenance.yaml \
+            --dry-run \
             --github-repo ${{ github.repository }} \
             --github-pr ${{ github.event.number }}
 
@@ -427,7 +488,7 @@ jobs:
       - name: Run opsql apply
         env:
           DATABASE_DSN: ${{ secrets.DATABASE_DSN }}
-        run: opsql apply --config db/operations/maintenance.yaml
+        run: opsql run --config db/operations/maintenance.yaml
 ```
 
 ## Common Use Cases

@@ -24,7 +24,7 @@ Use --dry-run to execute in dry-run mode without making permanent changes.`,
 }
 
 func init() {
-	runCmd.Flags().StringP("config", "c", "", "YAML configuration file path (required)")
+	runCmd.Flags().StringSliceP("config", "c", []string{}, "YAML configuration file paths (required, can specify multiple)")
 	runCmd.Flags().BoolP("dry-run", "d", false, "Execute in dry-run mode without making permanent changes")
 	runCmd.Flags().StringP("environment", "e", "", "Environment name (e.g., dev, staging, prod)")
 	runCmd.Flags().String("github-repo", "", "GitHub repository (owner/repo)")
@@ -35,7 +35,7 @@ func init() {
 }
 
 type RunConfig struct {
-	ConfigFile   string
+	ConfigFiles  []string
 	DatabaseDSN  string
 	DryRun       bool
 	Environment  string
@@ -52,7 +52,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	def, err := definition.LoadDefinition(config.ConfigFile)
+	def, err := definition.LoadDefinitions(config.ConfigFiles)
 	if err != nil {
 		return fmt.Errorf("failed to load definition: %w", err)
 	}
@@ -100,7 +100,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 func loadRunConfig(cmd *cobra.Command) (*RunConfig, error) {
 	config := &RunConfig{}
 
-	config.ConfigFile, _ = cmd.Flags().GetString("config")
+	config.ConfigFiles, _ = cmd.Flags().GetStringSlice("config")
 	config.DryRun, _ = cmd.Flags().GetBool("dry-run")
 	config.Environment, _ = cmd.Flags().GetString("environment")
 	config.GitHubRepo, _ = cmd.Flags().GetString("github-repo")
