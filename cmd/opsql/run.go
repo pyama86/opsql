@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/pyama86/opsql/internal/database"
@@ -133,6 +134,7 @@ func outputRunReports(reports []definition.Report) error {
 func sendRunGitHubComment(ctx context.Context, config *RunConfig, reports []definition.Report) error {
 	client := github.NewClient(config.GitHubRepo, config.GitHubPR)
 	if client == nil {
+		log.Printf("GitHub client not configured, skipping comment\n")
 		return nil // GitHub client not configured, skip sending comment
 	}
 	return client.PostCommentWithContext(ctx, reports, config.DryRun, config.Environment)

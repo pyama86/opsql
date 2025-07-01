@@ -81,12 +81,28 @@ func (c *Client) PostCommentWithContext(ctx context.Context, reports []definitio
 	owner, repoName := parts[0], parts[1]
 	comment := formatCommentWithContext(reports, isDryRun, environment)
 
-	_, _, err := c.client.Issues.CreateComment(ctx, owner, repoName, c.pr, &github.IssueComment{
-		Body: &comment,
-	})
-
+	// Try to find and update existing opsql comment
+	existingComment, err := c.findExistingOpsqlComment(ctx, owner, repoName, environment)
 	if err != nil {
-		return fmt.Errorf("failed to post comment: %w", err)
+		return fmt.Errorf("failed to search for existing comments: %w", err)
+	}
+
+	if existingComment != nil {
+		// Update existing comment
+		_, _, err = c.client.Issues.EditComment(ctx, owner, repoName, *existingComment.ID, &github.IssueComment{
+			Body: &comment,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update existing comment: %w", err)
+		}
+	} else {
+		// Create new comment
+		_, _, err = c.client.Issues.CreateComment(ctx, owner, repoName, c.pr, &github.IssueComment{
+			Body: &comment,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create comment: %w", err)
+		}
 	}
 
 	return nil
@@ -184,10 +200,12 @@ func newGitHubAppClient() *github.Client {
 	privateKeyContent := os.Getenv("GITHUB_APP_PRIVATE_KEY")
 
 	if appID == "" || installationID == "" {
+		log.Printf("GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID must be set for GitHub App authentication\n")
 		return nil
 	}
 
 	if privateKeyPath == "" && privateKeyContent == "" {
+		log.Printf("Either GITHUB_APP_PRIVATE_KEY_PATH or GITHUB_APP_PRIVATE_KEY must be set for GitHub App authentication\n")
 		return nil
 	}
 
@@ -199,22 +217,26 @@ func newGitHubAppClient() *github.Client {
 	} else {
 		privateKeyData, err = os.ReadFile(privateKeyPath)
 		if err != nil {
+			log.Printf("failed to read private key from %s: %v\n", privateKeyPath, err)
 			return nil
 		}
 	}
 
 	appIDInt, err := strconv.ParseInt(appID, 10, 64)
 	if err != nil {
+		log.Printf("invalid GITHUB_APP_ID: %v\n", err)
 		return nil
 	}
 
 	installationIDInt, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
+		log.Printf("invalid GITHUB_APP_INSTALLATION_ID: %v\n", err)
 		return nil
 	}
 
 	appTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appIDInt, privateKeyData)
 	if err != nil {
+		log.Printf("failed to create GitHub App transport: %v\n", err)
 		return nil
 	}
 
@@ -230,7 +252,8 @@ func newGitHubAppClient() *github.Client {
 		installationIDInt,
 		&github.InstallationTokenOptions{})
 	if err != nil {
-		log.Fatalf("failed to create installation token: %v\n", err)
+		log.Printf("failed to create installation token: %v\n", err)
+		return nil
 	}
 
 	return github.NewClient(nil).WithAuthToken(
