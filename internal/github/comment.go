@@ -36,7 +36,7 @@ func NewClient(repo string, pr int) *Client {
 	// Fallback to personal access token
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
-		return &Client{repo: repo, pr: pr}
+		return nil
 	}
 
 	ts := oauth2.StaticTokenSource(
@@ -236,4 +236,31 @@ func newGitHubAppClient() *github.Client {
 	return github.NewClient(nil).WithAuthToken(
 		token.GetToken(),
 	)
+}
+
+// findExistingOpsqlComment searches for existing opsql comments in the PR
+func (c *Client) findExistingOpsqlComment(ctx context.Context, owner, repoName, environment string) (*github.IssueComment, error) {
+	// List all comments for the PR
+	comments, _, err := c.client.Issues.ListComments(ctx, owner, repoName, c.pr, &github.IssueListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Build the expected comment prefix to identify opsql comments
+	expectedPrefix := "## "
+	if environment != "" {
+		expectedPrefix += fmt.Sprintf("[%s] ", environment)
+	}
+	expectedPrefix += "opsql Execution Results"
+
+	// Search for existing opsql comment
+	for _, comment := range comments {
+		if comment.Body != nil && strings.HasPrefix(*comment.Body, expectedPrefix) {
+			return comment, nil
+		}
+	}
+
+	return nil, nil
 }

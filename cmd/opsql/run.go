@@ -131,11 +131,10 @@ func outputRunReports(reports []definition.Report) error {
 }
 
 func sendRunGitHubComment(ctx context.Context, config *RunConfig, reports []definition.Report) error {
-	if os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_TOKEN") == "" {
-		return nil
-	}
-
 	client := github.NewClient(config.GitHubRepo, config.GitHubPR)
+	if client == nil {
+		return nil // GitHub client not configured, skip sending comment
+	}
 	return client.PostCommentWithContext(ctx, reports, config.DryRun, config.Environment)
 }
 
