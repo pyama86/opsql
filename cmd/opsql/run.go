@@ -69,30 +69,36 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}()
 
 	var reports []definition.Report
+	var executionErr error
 	if config.DryRun {
 		planExecutor := executor.NewPlanExecutor(db)
-		reports, err = planExecutor.Execute(ctx, def)
+		reports, executionErr = planExecutor.Execute(ctx, def)
 	} else {
 		applyExecutor := executor.NewApplyExecutor(db)
-		reports, err = applyExecutor.Execute(ctx, def)
+		reports, executionErr = applyExecutor.Execute(ctx, def)
 	}
-	if err != nil {
-		if config.DryRun {
-			return fmt.Errorf("failed to execute dry run: %w", err)
+
+	// Always output reports and send notifications, even on failure
+	if len(reports) > 0 {
+		if err := outputRunReports(reports); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to output reports: %v\n", err)
 		}
-		return fmt.Errorf("failed to execute: %w", err)
+
+		if err := sendRunGitHubComment(ctx, config, reports); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to send GitHub comment: %v\n", err)
+		}
+
+		if err := sendRunSlackNotification(config, reports); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to send Slack notification: %v\n", err)
+		}
 	}
 
-	if err := outputRunReports(reports); err != nil {
-		return fmt.Errorf("failed to output reports: %w", err)
-	}
-
-	if err := sendRunGitHubComment(ctx, config, reports); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to send GitHub comment: %v\n", err)
-	}
-
-	if err := sendRunSlackNotification(config, reports); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to send Slack notification: %v\n", err)
+	// Return the original execution error if it occurred
+	if executionErr != nil {
+		if config.DryRun {
+			return fmt.Errorf("failed to execute dry run: %w", executionErr)
+		}
+		return fmt.Errorf("failed to execute: %w", executionErr)
 	}
 
 	return nil
