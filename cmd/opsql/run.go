@@ -136,15 +136,6 @@ func outputRunReports(reports []definition.Report) error {
 	return nil
 }
 
-func sendRunGitHubComment(ctx context.Context, config *RunConfig, reports []definition.Report) error {
-	client := github.NewClient(config.GitHubRepo, config.GitHubPR)
-	if client == nil {
-		log.Printf("GitHub client not configured, skipping comment\n")
-		return nil // GitHub client not configured, skip sending comment
-	}
-	return client.PostCommentWithContext(ctx, reports, config.DryRun, config.Environment)
-}
-
 func sendRunGitHubCommentWithError(ctx context.Context, config *RunConfig, reports []definition.Report, executionErr error) error {
 	client := github.NewClient(config.GitHubRepo, config.GitHubPR)
 	if client == nil {
@@ -152,20 +143,6 @@ func sendRunGitHubCommentWithError(ctx context.Context, config *RunConfig, repor
 		return nil // GitHub client not configured, skip sending comment
 	}
 	return client.PostCommentWithContextAndError(ctx, reports, config.DryRun, config.Environment, executionErr)
-}
-
-func sendRunSlackNotification(config *RunConfig, reports []definition.Report) error {
-	webhookURL := config.SlackWebhook
-	if webhookURL == "" {
-		webhookURL = os.Getenv("SLACK_WEBHOOK_URL")
-	}
-
-	if webhookURL == "" {
-		return nil
-	}
-
-	client := slack.NewClient(webhookURL)
-	return client.SendNotificationWithContext(reports, config.DryRun, config.Environment)
 }
 
 func sendRunSlackNotificationWithError(config *RunConfig, reports []definition.Report, executionErr error) error {

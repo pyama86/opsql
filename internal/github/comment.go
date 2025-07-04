@@ -112,14 +112,6 @@ func (c *Client) PostCommentWithContextAndError(ctx context.Context, reports []d
 	return nil
 }
 
-func formatComment(reports []definition.Report) string {
-	return formatCommentWithContext(reports, false, "")
-}
-
-func formatCommentWithContext(reports []definition.Report, isDryRun bool, environment string) string {
-	return formatCommentWithContextAndError(reports, isDryRun, environment, nil)
-}
-
 func formatCommentWithContextAndError(reports []definition.Report, isDryRun bool, environment string, executionErr error) string {
 	var buf strings.Builder
 	title := "## "
@@ -135,13 +127,11 @@ func formatCommentWithContextAndError(reports []definition.Report, isDryRun bool
 	passCount := 0
 	failCount := 0
 
-	if reports != nil {
-		for _, report := range reports {
-			if report.Pass {
-				passCount++
-			} else {
-				failCount++
-			}
+	for _, report := range reports {
+		if report.Pass {
+			passCount++
+		} else {
+			failCount++
 		}
 	}
 
@@ -155,37 +145,35 @@ func formatCommentWithContextAndError(reports []definition.Report, isDryRun bool
 		buf.WriteString("\n```\n\n")
 	}
 
-	if reports != nil {
-		for _, report := range reports {
-			status := "✅"
-			if !report.Pass {
-				status = "❌"
-			}
+	for _, report := range reports {
+		status := "✅"
+		if !report.Pass {
+			status = "❌"
+		}
 
-			buf.WriteString(fmt.Sprintf("### %s %s - %s\n", status, report.ID, report.Description))
-			buf.WriteString(fmt.Sprintf("**Type:** %s\n", report.Type))
-			buf.WriteString(fmt.Sprintf("**Status:** %s\n", report.Message))
+		buf.WriteString(fmt.Sprintf("### %s %s - %s\n", status, report.ID, report.Description))
+		buf.WriteString(fmt.Sprintf("**Type:** %s\n", report.Type))
+		buf.WriteString(fmt.Sprintf("**Status:** %s\n", report.Message))
 
-			// Add SQL query
-			if report.SQL != "" {
-				buf.WriteString("**Query:**\n```sql\n")
-				buf.WriteString(report.SQL)
+		// Add SQL query
+		if report.SQL != "" {
+			buf.WriteString("**Query:**\n```sql\n")
+			buf.WriteString(report.SQL)
+			buf.WriteString("\n```\n")
+		}
+
+		if report.Type == definition.TypeSelect && report.Result != nil {
+			if rows, ok := report.Result.([]map[string]interface{}); ok && len(rows) > 0 {
+				buf.WriteString("**Result:**\n```json\n")
+				jsonData, _ := json.MarshalIndent(rows, "", "  ")
+				buf.WriteString(string(jsonData))
 				buf.WriteString("\n```\n")
 			}
-
-			if report.Type == definition.TypeSelect && report.Result != nil {
-				if rows, ok := report.Result.([]map[string]interface{}); ok && len(rows) > 0 {
-					buf.WriteString("**Result:**\n```json\n")
-					jsonData, _ := json.MarshalIndent(rows, "", "  ")
-					buf.WriteString(string(jsonData))
-					buf.WriteString("\n```\n")
-				}
-			} else if report.Result != nil {
-				buf.WriteString(fmt.Sprintf("**Affected Rows:** %v\n", report.Result))
-			}
-
-			buf.WriteString("\n")
+		} else if report.Result != nil {
+			buf.WriteString(fmt.Sprintf("**Affected Rows:** %v\n", report.Result))
 		}
+
+		buf.WriteString("\n")
 	}
 
 	return buf.String()

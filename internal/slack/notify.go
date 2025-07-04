@@ -43,25 +43,15 @@ func (c *Client) SendNotificationWithContextAndError(reports []definition.Report
 	return slack.PostWebhook(c.webhookURL, msg)
 }
 
-func (c *Client) buildBlocks(reports []definition.Report) []slack.Block {
-	return c.buildBlocksWithContext(reports, false, "")
-}
-
-func (c *Client) buildBlocksWithContext(reports []definition.Report, isDryRun bool, environment string) []slack.Block {
-	return c.buildBlocksWithContextAndError(reports, isDryRun, environment, nil)
-}
-
 func (c *Client) buildBlocksWithContextAndError(reports []definition.Report, isDryRun bool, environment string, executionErr error) []slack.Block {
 	passCount := 0
 	failCount := 0
 
-	if reports != nil {
-		for _, report := range reports {
-			if report.Pass {
-				passCount++
-			} else {
-				failCount++
-			}
+	for _, report := range reports {
+		if report.Pass {
+			passCount++
+		} else {
+			failCount++
 		}
 	}
 
@@ -102,10 +92,8 @@ func (c *Client) buildBlocksWithContextAndError(reports []definition.Report, isD
 	blocks = append(blocks, slack.NewDividerBlock())
 
 	// Operation details
-	if reports != nil {
-		for _, report := range reports {
-			blocks = append(blocks, c.buildOperationBlock(report))
-		}
+	for _, report := range reports {
+		blocks = append(blocks, c.buildOperationBlock(report))
 	}
 
 	return blocks
