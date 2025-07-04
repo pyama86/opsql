@@ -21,7 +21,7 @@ func LoadDefinitions(configPaths []string) (*Definition, error) {
 	// Load and merge multiple configuration files
 	var mergedDef *Definition
 	for i, configPath := range configPaths {
-		def, err := LoadDefinition(configPath)
+		def, err := LoadDefinitionRaw(configPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config file %s: %w", configPath, err)
 		}
@@ -35,18 +35,22 @@ func LoadDefinitions(configPaths []string) (*Definition, error) {
 		}
 	}
 
+	// Validate and process templates after merging
+	if err := mergedDef.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := mergedDef.ProcessTemplates(); err != nil {
+		return nil, err
+	}
+
 	return mergedDef, nil
 }
 
 func LoadDefinition(configPath string) (*Definition, error) {
-	data, err := os.ReadFile(configPath)
+	def, err := LoadDefinitionRaw(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %s %w", configPath, err)
-	}
-
-	var def Definition
-	if err := yaml.Unmarshal(data, &def); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		return nil, err
 	}
 
 	if err := def.Validate(); err != nil {
@@ -57,6 +61,20 @@ func LoadDefinition(configPath string) (*Definition, error) {
 		return nil, err
 	}
 
+	return def, nil
+}
+
+func LoadDefinitionRaw(configPath string) (*Definition, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %s %w", configPath, err)
+	}
+
+	var def Definition
+	if err := yaml.Unmarshal(data, &def); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
 	return &def, nil
 }
 
@@ -65,16 +83,35 @@ func (d *Definition) Validate() error {
 		return fmt.Errorf("unsupported version: %d", d.Version)
 	}
 
+	// Build map of existing IDs and assign unique IDs to operations without IDs
+	existingIDs := make(map[string]bool)
+	
+	// First pass: collect existing explicit IDs
+	for _, op := range d.Operations {
+		if op.ID != "" {
+			existingIDs[op.ID] = true
+		}
+	}
+	
+	// Second pass: assign unique IDs to operations without IDs
 	for i, op := range d.Operations {
 		if op.SQL == "" {
 			return fmt.Errorf("operation[%d]: sql is required", i)
 		}
 
-		// IDが未指定の場合はインデックスを使用
+		// IDが未指定の場合はユニークなIDを生成
 		opID := op.ID
 		if opID == "" {
-			opID = fmt.Sprintf("operation_%d", i)
-			d.Operations[i].ID = opID
+			// Find next available operation_N ID
+			for idIndex := 0; ; idIndex++ {
+				candidateID := fmt.Sprintf("operation_%d", idIndex)
+				if !existingIDs[candidateID] {
+					opID = candidateID
+					existingIDs[candidateID] = true
+					d.Operations[i].ID = opID
+					break
+				}
+			}
 		}
 
 		// Typeが未指定の場合はSQLから自動判定
@@ -152,38 +189,23 @@ func mergeDefinitions(base, additional *Definition) error {
 		base.Params[key] = value
 	}
 
-	// Check for duplicate operation IDs and build existing ID map
+	// Check for duplicate operation IDs among explicitly set IDs only
 	existingIDs := make(map[string]bool)
-	for i, op := range base.Operations {
-		id := op.ID
-		if id == "" {
-			id = fmt.Sprintf("operation_%d", i)
+	for _, op := range base.Operations {
+		if op.ID != "" {
+			existingIDs[op.ID] = true
 		}
-		existingIDs[id] = true
 	}
 
-	// Append operations from additional definition
+	// Check additional operations for duplicates with explicit IDs only
 	for _, op := range additional.Operations {
-		var opID string
 		if op.ID != "" {
-			opID = op.ID
-			if existingIDs[opID] {
-				return fmt.Errorf("duplicate operation ID: %s", opID)
+			if existingIDs[op.ID] {
+				return fmt.Errorf("duplicate operation ID: %s", op.ID)
 			}
-		} else {
-			// Auto-generate unique ID for operations without explicit ID
-			// Find next available operation_N ID
-			for idIndex := 0; ; idIndex++ {
-				candidateID := fmt.Sprintf("operation_%d", idIndex)
-				if !existingIDs[candidateID] {
-					opID = candidateID
-					break
-				}
-			}
+			existingIDs[op.ID] = true
 		}
-
 		base.Operations = append(base.Operations, op)
-		existingIDs[opID] = true
 	}
 
 	return nil
