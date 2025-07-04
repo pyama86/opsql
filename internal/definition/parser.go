@@ -163,7 +163,7 @@ func mergeDefinitions(base, additional *Definition) error {
 	}
 
 	// Append operations from additional definition
-	for i, op := range additional.Operations {
+	for _, op := range additional.Operations {
 		var opID string
 		if op.ID != "" {
 			opID = op.ID
@@ -172,9 +172,13 @@ func mergeDefinitions(base, additional *Definition) error {
 			}
 		} else {
 			// Auto-generate unique ID for operations without explicit ID
-			opID = fmt.Sprintf("operation_%d", len(base.Operations)+i)
-			if existingIDs[opID] {
-				return fmt.Errorf("auto-generated operation ID conflict: %s", opID)
+			// Find next available operation_N ID
+			for idIndex := 0; ; idIndex++ {
+				candidateID := fmt.Sprintf("operation_%d", idIndex)
+				if !existingIDs[candidateID] {
+					opID = candidateID
+					break
+				}
 			}
 		}
 
