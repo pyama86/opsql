@@ -24,11 +24,15 @@ func (c *Client) SendNotification(reports []definition.Report) error {
 }
 
 func (c *Client) SendNotificationWithContext(reports []definition.Report, isDryRun bool, environment string) error {
+	return c.SendNotificationWithContextAndError(reports, isDryRun, environment, nil)
+}
+
+func (c *Client) SendNotificationWithContextAndError(reports []definition.Report, isDryRun bool, environment string, executionErr error) error {
 	if c.webhookURL == "" {
 		return fmt.Errorf("SLACK_WEBHOOK_URL is not set")
 	}
 
-	blocks := c.buildBlocksWithContext(reports, isDryRun, environment)
+	blocks := c.buildBlocksWithContextAndError(reports, isDryRun, environment, executionErr)
 	msg := &slack.WebhookMessage{
 		Username: "opsql",
 		Blocks: &slack.Blocks{
@@ -44,14 +48,20 @@ func (c *Client) buildBlocks(reports []definition.Report) []slack.Block {
 }
 
 func (c *Client) buildBlocksWithContext(reports []definition.Report, isDryRun bool, environment string) []slack.Block {
+	return c.buildBlocksWithContextAndError(reports, isDryRun, environment, nil)
+}
+
+func (c *Client) buildBlocksWithContextAndError(reports []definition.Report, isDryRun bool, environment string, executionErr error) []slack.Block {
 	passCount := 0
 	failCount := 0
 
-	for _, report := range reports {
-		if report.Pass {
-			passCount++
-		} else {
-			failCount++
+	if reports != nil {
+		for _, report := range reports {
+			if report.Pass {
+				passCount++
+			} else {
+				failCount++
+			}
 		}
 	}
 
@@ -70,7 +80,7 @@ func (c *Client) buildBlocksWithContext(reports []definition.Report, isDryRun bo
 
 	// Summary section
 	summaryEmoji := "✅"
-	if failCount > 0 {
+	if failCount > 0 || executionErr != nil {
 		summaryEmoji = "❌"
 	}
 
@@ -80,12 +90,22 @@ func (c *Client) buildBlocksWithContext(reports []definition.Report, isDryRun bo
 		nil, nil,
 	))
 
+	// Error section if execution error occurred
+	if executionErr != nil {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("🚨 *Execution Error:*\n```%s```", executionErr.Error()), false, false),
+			nil, nil,
+		))
+	}
+
 	// Divider
 	blocks = append(blocks, slack.NewDividerBlock())
 
 	// Operation details
-	for _, report := range reports {
-		blocks = append(blocks, c.buildOperationBlock(report))
+	if reports != nil {
+		for _, report := range reports {
+			blocks = append(blocks, c.buildOperationBlock(report))
+		}
 	}
 
 	return blocks

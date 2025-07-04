@@ -13,11 +13,11 @@ func LoadDefinitions(configPaths []string) (*Definition, error) {
 	if len(configPaths) == 0 {
 		return nil, fmt.Errorf("no configuration files specified")
 	}
-	
+
 	if len(configPaths) == 1 {
 		return LoadDefinition(configPaths[0])
 	}
-	
+
 	// Load and merge multiple configuration files
 	var mergedDef *Definition
 	for i, configPath := range configPaths {
@@ -25,7 +25,7 @@ func LoadDefinitions(configPaths []string) (*Definition, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config file %s: %w", configPath, err)
 		}
-		
+
 		if i == 0 {
 			mergedDef = def
 		} else {
@@ -34,7 +34,7 @@ func LoadDefinitions(configPaths []string) (*Definition, error) {
 			}
 		}
 	}
-	
+
 	return mergedDef, nil
 }
 
@@ -143,7 +143,7 @@ func mergeDefinitions(base, additional *Definition) error {
 	if base.Version != additional.Version {
 		return fmt.Errorf("version mismatch: base has version %d, additional has version %d", base.Version, additional.Version)
 	}
-	
+
 	// Merge parameters - additional params override base params
 	if base.Params == nil {
 		base.Params = make(map[string]string)
@@ -151,36 +151,36 @@ func mergeDefinitions(base, additional *Definition) error {
 	for key, value := range additional.Params {
 		base.Params[key] = value
 	}
-	
-	// Check for duplicate operation IDs
+
+	// Check for duplicate operation IDs and build existing ID map
 	existingIDs := make(map[string]bool)
-	for _, op := range base.Operations {
-		if op.ID != "" {
-			existingIDs[op.ID] = true
+	for i, op := range base.Operations {
+		id := op.ID
+		if id == "" {
+			id = fmt.Sprintf("operation_%d", i)
 		}
+		existingIDs[id] = true
 	}
-	
+
 	// Append operations from additional definition
 	for i, op := range additional.Operations {
-		if op.ID != "" && existingIDs[op.ID] {
-			return fmt.Errorf("duplicate operation ID: %s", op.ID)
-		}
-		
-		// If ID is empty, it will be auto-generated during validation
-		// But we need to track it to avoid duplicates
-		if op.ID == "" {
-			// Auto-generate ID for checking duplicates
-			autoID := fmt.Sprintf("operation_%d", len(base.Operations)+i)
-			if existingIDs[autoID] {
-				return fmt.Errorf("auto-generated operation ID conflict: %s", autoID)
+		var opID string
+		if op.ID != "" {
+			opID = op.ID
+			if existingIDs[opID] {
+				return fmt.Errorf("duplicate operation ID: %s", opID)
+			}
+		} else {
+			// Auto-generate unique ID for operations without explicit ID
+			opID = fmt.Sprintf("operation_%d", len(base.Operations)+i)
+			if existingIDs[opID] {
+				return fmt.Errorf("auto-generated operation ID conflict: %s", opID)
 			}
 		}
-		
+
 		base.Operations = append(base.Operations, op)
-		if op.ID != "" {
-			existingIDs[op.ID] = true
-		}
+		existingIDs[opID] = true
 	}
-	
+
 	return nil
 }

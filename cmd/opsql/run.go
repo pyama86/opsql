@@ -55,12 +55,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	def, err := definition.LoadDefinitions(config.ConfigFiles)
 	if err != nil {
-		return fmt.Errorf("failed to load definition: %w", err)
+		definitionErr := fmt.Errorf("failed to load definition: %w", err)
+		sendNotifications(ctx, config, nil, definitionErr)
+		return definitionErr
 	}
 
 	db, err := database.NewDatabase(config.DatabaseDSN)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		dbErr := fmt.Errorf("failed to connect to database: %w", err)
+		sendNotifications(ctx, config, nil, dbErr)
+		return dbErr
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -83,15 +87,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if err := outputRunReports(reports); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to output reports: %v\n", err)
 		}
-
-		if err := sendRunGitHubComment(ctx, config, reports); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to send GitHub comment: %v\n", err)
-		}
-
-		if err := sendRunSlackNotification(config, reports); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to send Slack notification: %v\n", err)
-		}
 	}
+
+	// Send notifications regardless of whether we have reports
+	sendNotifications(ctx, config, reports, executionErr)
 
 	// Return the original execution error if it occurred
 	if executionErr != nil {
@@ -146,6 +145,15 @@ func sendRunGitHubComment(ctx context.Context, config *RunConfig, reports []defi
 	return client.PostCommentWithContext(ctx, reports, config.DryRun, config.Environment)
 }
 
+func sendRunGitHubCommentWithError(ctx context.Context, config *RunConfig, reports []definition.Report, executionErr error) error {
+	client := github.NewClient(config.GitHubRepo, config.GitHubPR)
+	if client == nil {
+		log.Printf("GitHub client not configured, skipping comment\n")
+		return nil // GitHub client not configured, skip sending comment
+	}
+	return client.PostCommentWithContextAndError(ctx, reports, config.DryRun, config.Environment, executionErr)
+}
+
 func sendRunSlackNotification(config *RunConfig, reports []definition.Report) error {
 	webhookURL := config.SlackWebhook
 	if webhookURL == "" {
@@ -158,4 +166,29 @@ func sendRunSlackNotification(config *RunConfig, reports []definition.Report) er
 
 	client := slack.NewClient(webhookURL)
 	return client.SendNotificationWithContext(reports, config.DryRun, config.Environment)
+}
+
+func sendRunSlackNotificationWithError(config *RunConfig, reports []definition.Report, executionErr error) error {
+	webhookURL := config.SlackWebhook
+	if webhookURL == "" {
+		webhookURL = os.Getenv("SLACK_WEBHOOK_URL")
+	}
+
+	if webhookURL == "" {
+		return nil
+	}
+
+	client := slack.NewClient(webhookURL)
+	return client.SendNotificationWithContextAndError(reports, config.DryRun, config.Environment, executionErr)
+}
+
+// sendNotifications sends notifications to both Slack and GitHub
+func sendNotifications(ctx context.Context, config *RunConfig, reports []definition.Report, err error) {
+	if err := sendRunGitHubCommentWithError(ctx, config, reports, err); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to send GitHub comment: %v\n", err)
+	}
+
+	if err := sendRunSlackNotificationWithError(config, reports, err); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to send Slack notification: %v\n", err)
+	}
 }
