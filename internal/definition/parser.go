@@ -29,7 +29,7 @@ func LoadDefinitions(configPaths []string) (*Definition, error) {
 		if i == 0 {
 			mergedDef = def
 		} else {
-			if err := mergeDefinitions(mergedDef, def); err != nil {
+			if err := MergeDefinitions(mergedDef, def); err != nil {
 				return nil, fmt.Errorf("failed to merge config file %s: %w", configPath, err)
 			}
 		}
@@ -85,14 +85,14 @@ func (d *Definition) Validate() error {
 
 	// Build map of existing IDs and assign unique IDs to operations without IDs
 	existingIDs := make(map[string]bool)
-	
+
 	// First pass: collect existing explicit IDs
 	for _, op := range d.Operations {
 		if op.ID != "" {
 			existingIDs[op.ID] = true
 		}
 	}
-	
+
 	// Second pass: assign unique IDs to operations without IDs
 	for i, op := range d.Operations {
 		if op.SQL == "" {
@@ -174,8 +174,8 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// mergeDefinitions merges two definitions together
-func mergeDefinitions(base, additional *Definition) error {
+// MergeDefinitions merges two definitions together
+func MergeDefinitions(base, additional *Definition) error {
 	// Version validation - all files should have the same version
 	if base.Version != additional.Version {
 		return fmt.Errorf("version mismatch: base has version %d, additional has version %d", base.Version, additional.Version)
@@ -189,24 +189,73 @@ func mergeDefinitions(base, additional *Definition) error {
 		base.Params[key] = value
 	}
 
-	// Check for duplicate operation IDs among explicitly set IDs only
+	// Check for duplicate operation IDs among all IDs (explicit and auto-generated)
 	existingIDs := make(map[string]bool)
 	for _, op := range base.Operations {
 		if op.ID != "" {
 			existingIDs[op.ID] = true
+		} else {
+			// Reserve operation_0 for operations without ID in base
+			existingIDs["operation_0"] = true
 		}
 	}
 
-	// Check additional operations for duplicates with explicit IDs only
+	// Process additional operations
 	for _, op := range additional.Operations {
-		if op.ID != "" {
-			if existingIDs[op.ID] {
-				return fmt.Errorf("duplicate operation ID: %s", op.ID)
+		// Deep copy the operation to avoid sharing references
+		copiedOp := deepCopyOperation(op)
+
+		// Check for duplicate explicit IDs
+		if copiedOp.ID != "" {
+			if existingIDs[copiedOp.ID] {
+				return fmt.Errorf("duplicate operation ID: %s", copiedOp.ID)
 			}
-			existingIDs[op.ID] = true
+			existingIDs[copiedOp.ID] = true
+		} else {
+			// Assign unique auto-generated ID if not set
+			for idIndex := 0; ; idIndex++ {
+				candidateID := fmt.Sprintf("operation_%d", idIndex)
+				if !existingIDs[candidateID] {
+					copiedOp.ID = candidateID
+					existingIDs[candidateID] = true
+					break
+				}
+			}
 		}
-		base.Operations = append(base.Operations, op)
+
+		base.Operations = append(base.Operations, copiedOp)
 	}
 
 	return nil
+}
+
+// deepCopyOperation creates a deep copy of an Operation to avoid sharing references
+func deepCopyOperation(op Operation) Operation {
+	copied := Operation{
+		ID:          op.ID,
+		Description: op.Description,
+		Type:        op.Type,
+		SQL:         op.SQL,
+	}
+
+	// Deep copy Expected slice
+	if op.Expected != nil {
+		copied.Expected = make([]map[string]interface{}, len(op.Expected))
+		for i, expectedMap := range op.Expected {
+			copied.Expected[i] = make(map[string]interface{})
+			for key, value := range expectedMap {
+				copied.Expected[i][key] = value
+			}
+		}
+	}
+
+	// Deep copy ExpectedChanges map
+	if op.ExpectedChanges != nil {
+		copied.ExpectedChanges = make(map[string]int)
+		for key, value := range op.ExpectedChanges {
+			copied.ExpectedChanges[key] = value
+		}
+	}
+
+	return copied
 }

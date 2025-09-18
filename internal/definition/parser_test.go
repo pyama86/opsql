@@ -8,11 +8,11 @@ import (
 
 func TestMergeDefinitions(t *testing.T) {
 	tests := []struct {
-		name      string
-		base      *Definition
+		name       string
+		base       *Definition
 		additional *Definition
-		wantError bool
-		errorMsg  string
+		wantError  bool
+		errorMsg   string
 	}{
 		{
 			name: "merge with explicit IDs - no duplicates",
@@ -122,12 +122,28 @@ func TestMergeDefinitions(t *testing.T) {
 			},
 			wantError: false,
 		},
+		{
+			name: "merge with auto-generated IDs avoiding duplicates",
+			base: &Definition{
+				Version: 1,
+				Operations: []Operation{
+					{SQL: "SELECT 1"}, // will be operation_0
+				},
+			},
+			additional: &Definition{
+				Version: 1,
+				Operations: []Operation{
+					{SQL: "SELECT 2"}, // should be operation_1, not operation_0
+				},
+			},
+			wantError: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := mergeDefinitions(tt.base, tt.additional)
-			
+			err := MergeDefinitions(tt.base, tt.additional)
+
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -138,12 +154,12 @@ func TestMergeDefinitions(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
-			
+
 			// Verify merge results
 			if tt.name == "merge parameters" {
 				expectedParams := map[string]string{
@@ -151,11 +167,23 @@ func TestMergeDefinitions(t *testing.T) {
 					"param2": "override", // should be overridden
 					"param3": "value3",
 				}
-				
+
 				for key, expectedValue := range expectedParams {
 					if actualValue, exists := tt.base.Params[key]; !exists || actualValue != expectedValue {
 						t.Errorf("expected param %s=%s, got %s=%s", key, expectedValue, key, actualValue)
 					}
+				}
+			}
+
+			// Verify auto-generated ID uniqueness
+			if tt.name == "merge with auto-generated IDs avoiding duplicates" {
+				if len(tt.base.Operations) != 2 {
+					t.Errorf("expected 2 operations, got %d", len(tt.base.Operations))
+				}
+
+				// Check that the additional operation has been assigned an ID during merge
+				if tt.base.Operations[1].ID != "operation_1" {
+					t.Errorf("second operation should have operation_1 as ID, got %s", tt.base.Operations[1].ID)
 				}
 			}
 		})
@@ -172,7 +200,7 @@ func TestLoadDefinitionsMultipleFiles(t *testing.T) {
 		errorMsg  string
 	}{
 		{
-			name: "two files with no ID duplicates",
+			name:  "two files with no ID duplicates",
 			files: []string{"test1.yaml", "test2.yaml"},
 			contents: []string{
 				`version: 1
@@ -195,7 +223,7 @@ operations:
 			wantError: false,
 		},
 		{
-			name: "two files with duplicate operation_0",
+			name:  "two files with duplicate operation_0",
 			files: []string{"test1.yaml", "test2.yaml"},
 			contents: []string{
 				`version: 1
@@ -219,7 +247,7 @@ operations:
 			errorMsg:  "duplicate operation ID: operation_0",
 		},
 		{
-			name: "two files with auto-generated IDs",
+			name:  "two files with auto-generated IDs",
 			files: []string{"test1.yaml", "test2.yaml"},
 			contents: []string{
 				`version: 1
@@ -255,7 +283,7 @@ operations:
 
 			// Test LoadDefinitions
 			def, err := LoadDefinitions(tempFiles)
-			
+
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -266,23 +294,23 @@ operations:
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
-			
+
 			if def == nil {
 				t.Error("expected definition but got nil")
 				return
 			}
-			
+
 			// For auto-generated ID test, verify IDs are unique
 			if tt.name == "two files with auto-generated IDs" {
 				if len(def.Operations) != 2 {
 					t.Errorf("expected 2 operations, got %d", len(def.Operations))
 				}
-				
+
 				// Check that all operations have unique IDs after validation
 				ids := make(map[string]bool)
 				for _, op := range def.Operations {
