@@ -181,10 +181,21 @@ func MergeDefinitions(base, additional *Definition) error {
 		return fmt.Errorf("version mismatch: base has version %d, additional has version %d", base.Version, additional.Version)
 	}
 
-	// Merge parameters - additional params override base params
+	// Merge parameters - additional params override base params with deep copy
 	if base.Params == nil {
 		base.Params = make(map[string]string)
 	}
+
+	// Deep copy base params to avoid sharing references
+	if len(base.Params) > 0 {
+		copiedParams := make(map[string]string)
+		for key, value := range base.Params {
+			copiedParams[key] = value
+		}
+		base.Params = copiedParams
+	}
+
+	// Add additional params (values are copied since string is a value type)
 	for key, value := range additional.Params {
 		base.Params[key] = value
 	}
@@ -198,6 +209,11 @@ func MergeDefinitions(base, additional *Definition) error {
 			// Reserve operation_0 for operations without ID in base
 			existingIDs["operation_0"] = true
 		}
+	}
+
+	// Deep copy base operations to avoid sharing references
+	for i, op := range base.Operations {
+		base.Operations[i] = deepCopyOperation(op)
 	}
 
 	// Process additional operations
