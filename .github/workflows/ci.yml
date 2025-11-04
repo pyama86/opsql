@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.4"
+          go-version: "1.25.3"
           cache: true
 
       - name: Install development dependencies
@@ -39,3 +39,65 @@ jobs:
 
       - name: Build
         run: make build
+
+  e2e-mysql:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: opsql_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache: true
+
+      - name: Run MySQL E2E tests
+        env:
+          MYSQL_DSN: "root:root@tcp(localhost:3306)/opsql_test?parseTime=true"
+        run: go test -v ./e2e/... -run TestE2E_MySQL
+
+  e2e-postgres:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: opsql_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache: true
+
+      - name: Run PostgreSQL E2E tests
+        env:
+          POSTGRES_DSN: "postgres://postgres:postgres@localhost:5432/opsql_test?sslmode=disable"
+        run: go test -v ./e2e/... -run TestE2E_PostgreSQL
