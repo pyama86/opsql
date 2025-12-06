@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -27,11 +29,14 @@ type Transaction interface {
 
 type Database struct {
 	*sqlx.DB
-	driver string
+	driver       string
+	queryTimeout int // タイムアウト時間（秒）
 }
 
 type Tx struct {
 	*sqlx.Tx
+	driver       string
+	queryTimeout int
 }
 
 func NewDatabase(dsn string) (DB, error) {
@@ -50,10 +55,29 @@ func NewDatabase(dsn string) (DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
+	queryTimeout := getQueryTimeout()
+
 	return &Database{
-		DB:     db,
-		driver: driver,
+		DB:           db,
+		driver:       driver,
+		queryTimeout: queryTimeout,
 	}, nil
+}
+
+// getQueryTimeout は環境変数からクエリタイムアウト値を取得する
+func getQueryTimeout() int {
+	const defaultTimeout = 30
+	timeoutStr := os.Getenv("OPSQL_QUERY_TIMEOUT")
+	if timeoutStr == "" {
+		return defaultTimeout
+	}
+
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeout <= 0 {
+		return defaultTimeout
+	}
+
+	return timeout
 }
 
 func (d *Database) QueryRowsContext(ctx context.Context, query string, args ...interface{}) ([]map[string]interface{}, error) {
@@ -97,7 +121,37 @@ func (d *Database) BeginTransaction(ctx context.Context) (Transaction, error) {
 		return nil, err
 	}
 
-	return &Tx{Tx: tx}, nil
+	// セッションレベルでクエリタイムアウトを設定
+	if err := d.setQueryTimeout(ctx, tx); err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("failed to set query timeout: %w", err)
+	}
+
+	return &Tx{
+		Tx:           tx,
+		driver:       d.driver,
+		queryTimeout: d.queryTimeout,
+	}, nil
+}
+
+// setQueryTimeout はデータベースドライバに応じてクエリタイムアウトを設定する
+func (d *Database) setQueryTimeout(ctx context.Context, tx *sqlx.Tx) error {
+	switch d.driver {
+	case "mysql":
+		// MySQLの場合、max_execution_timeを設定（ミリ秒単位）
+		timeoutMs := d.queryTimeout * 1000
+		query := fmt.Sprintf("SET SESSION max_execution_time = %d", timeoutMs)
+		_, err := tx.ExecContext(ctx, query)
+		return err
+	case "postgres":
+		// PostgreSQLの場合、statement_timeoutを設定（ミリ秒単位）
+		timeoutMs := d.queryTimeout * 1000
+		query := fmt.Sprintf("SET SESSION statement_timeout = %d", timeoutMs)
+		_, err := tx.ExecContext(ctx, query)
+		return err
+	default:
+		return nil
+	}
 }
 
 func (t *Tx) QueryRowsContext(ctx context.Context, query string, args ...interface{}) ([]map[string]interface{}, error) {
