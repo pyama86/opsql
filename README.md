@@ -411,6 +411,9 @@ cp .env.example .env
 
 ### Optional
 
+**Query Timeout:**
+- `OPSQL_QUERY_TIMEOUT`: クエリの最大実行時間（秒単位）。デフォルトは30秒。MySQLでは`max_execution_time`、PostgreSQLでは`statement_timeout`として設定されます。
+
 **GitHub Integration (choose one):**
 
 *Option A: Personal Access Token*
