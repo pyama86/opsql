@@ -13,6 +13,14 @@ func compareValues(actual, expected interface{}) bool {
 		return false
 	}
 
+	// []byte を string に変換（MySQLドライバはVARCHAR型を[]byteで返すため）
+	if b, ok := actual.([]byte); ok {
+		actual = string(b)
+	}
+	if b, ok := expected.([]byte); ok {
+		expected = string(b)
+	}
+
 	actualValue := reflect.ValueOf(actual)
 	expectedValue := reflect.ValueOf(expected)
 
